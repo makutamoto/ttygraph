@@ -1,0 +1,11 @@
+[package]
+name = "graph"
+version = "0.1.0"
+authors = ["Makutamoto <34860673+makutamoto@users.noreply.github.com>"]
+
+[dependencies]
+log = "0.4.6"
+ncurses = "5.97.0"
+rand = "0.6.1"
+regex = "1.1.0"
+simplelog = "0.5.3"
