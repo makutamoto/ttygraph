@@ -8,6 +8,14 @@ const NO_OPERAND_FOUND: &str = "No operand found.";
 const INVALID_STACK: &str = "Invalid stack id.";
 const INVALID_OPERAND: &str = "Invalid operand!";
 
+#[derive(Debug, Clone)]
+enum Function {
+    Absolute,
+    Sine,
+    Cosine,
+    Tangent,
+}
+
 #[derive(Debug)]
 enum Operand {
     Decimal(bool, f64),
@@ -23,6 +31,7 @@ enum Operation {
     Divide,
     Modulus,
     Add,
+    Function(Function, Vec<usize>),
 }
 
 #[derive(Debug)]
@@ -90,6 +99,7 @@ impl Formula {
 static REGEX_INIT: Once = Once::new();
 static mut UNARY: Option<Regex> = None;
 static mut PARENTHESES: Option<Regex> = None;
+static mut ARGUMENTS: Option<Regex> = None;
 static mut POWER: Option<Regex> = None;
 static mut MULTIPLE: Option<Regex> = None;
 static mut DIVIDE: Option<Regex> = None;
@@ -100,7 +110,8 @@ impl Side {
         REGEX_INIT.call_once(|| {
             unsafe {
                 UNARY = Some(Regex::new(r"(-?)\s*([xy]|S*\d+)").unwrap());
-                PARENTHESES = Some(Regex::new(r"\((.*?)\)").unwrap());
+                PARENTHESES = Some(Regex::new(r"([\w\d]*)\((.*)\)").unwrap());
+                ARGUMENTS = Some(Regex::new(r"(?:\(.*?\)|[^(,]+)+").unwrap());
                 POWER = Some(Regex::new(r"(-?)\s*([xy]|S*\d+)\s*\^\s*(-?)\s*([xy]|S*\d+)").unwrap());
                 MULTIPLE = Some(Regex::new(r"(-?)\s*([xy]|S*\d+)\s*\*\s*(-?)\s*([xy]|S*\d+)").unwrap());
                 DIVIDE = Some(Regex::new(r"(-?)\s*([xy]|S*\d+)\s*/\s*(-?)\s*([xy]|S*\d+)").unwrap());
@@ -148,6 +159,14 @@ impl Side {
                 },
                 Operation::Modulus => operands.0 % operands.1,
                 Operation::Add => operands.0 + operands.1,
+                Operation::Function(ref name, ref args) => {
+                    match name {
+                        Function::Absolute => f64::abs(stacks[args[0]]),
+                        Function::Sine => f64::sin(stacks[args[0]]),
+                        Function::Cosine => f64::cos(stacks[args[0]]),
+                        Function::Tangent => f64::tan(stacks[args[0]]),
+                    }
+                },
             };
             stacks.insert(instruction.out, result);
         }
@@ -157,19 +176,59 @@ impl Side {
 
 fn parse(mut formula: String, nof_stacks: &mut usize, instructions: &mut Vec<Instruction>) -> Result<usize, &'static str> {
     loop {
+        let fn_name;
         let range;
+        let mut content: String;
         let id;
-        match unsafe { PARENTHESES.as_ref().unwrap().find(&formula) } {
-            Some(matched) => {
-                range = (matched.start(), matched.end());
+        match unsafe { PARENTHESES.as_ref().unwrap().captures(&formula) } {
+            Some(captured) => {
+                let content = captured.get(2).unwrap();
+                range = (content.start(), content.end());
+                fn_name = captured[1].to_ascii_uppercase().to_string();
             },
             None => break,
         }
-        match parse(formula.drain(range.0+1..range.1-1).collect(), nof_stacks, instructions) {
-            Ok(result) => id = result,
-            Err(e) => return Err(e),
+        content = formula.drain(range.0..range.1).collect();
+        if fn_name.len() != 0 {
+            let function = match fn_name.as_str() {
+                "ABS" => (Function::Absolute, 1),
+                "SIN" => (Function::Sine, 1),
+                "COS" => (Function::Cosine, 1),
+                "TAN" => (Function::Tangent, 1),
+                _ => return Err("Unimplemented function."),
+            };
+            let mut args = Vec::new();
+            loop {
+                let range;
+                match unsafe { ARGUMENTS.as_ref().unwrap().find(&content) } {
+                    Some(matched) => range = (matched.start(), matched.end()),
+                    None => break,
+                }
+                match parse(content.drain(range.0..range.1).collect(), nof_stacks, instructions) {
+                    Ok(result) => args.push(result),
+                    Err(e) => return Err(e),
+                }
+            }
+            if args.len() < function.1 {
+                return Err("Too few arguments.");
+            } else if args.len() > function.1 {
+                return Err("Too many arguments.");
+            }
+            instructions.push(Instruction {
+                operand_left: Operand::Decimal(true, 0.0),
+                operand_right: Operand::Decimal(true, 0.0),
+                operation: Operation::Function(function.0, args),
+                out: *nof_stacks,
+            });
+            formula.replace_range(range.0-1-fn_name.len()..range.0+1, &format!("S{}", *nof_stacks));
+            *nof_stacks += 1;
+        } else {
+            match parse(content, nof_stacks, instructions) {
+                Ok(result) => id = result,
+                Err(e) => return Err(e),
+            }
+            formula.replace_range(range.0-1..range.0+1, &format!("S{}", id));
         }
-        formula.replace_range(range.0..range.0+2, &format!("S{}", id));
     }
     generate_instructions(&mut formula, instructions, nof_stacks, unsafe { POWER.as_ref().unwrap() }, |a, b| a.powf(b), Operation::Power);
     generate_instructions(&mut formula, instructions, nof_stacks, unsafe { MULTIPLE.as_ref().unwrap() }, |a, b| a * b, Operation::Multiple);
@@ -192,7 +251,17 @@ fn parse(mut formula: String, nof_stacks: &mut usize, instructions: &mut Vec<Ins
                             *nof_stacks += 1;
                             Ok(id)
                         },
-                        Operand::Stack(_, id) => Ok(id),
+                        Operand::Stack(sign, id) => {
+                            let new_id = *nof_stacks;
+                            instructions.push(Instruction {
+                                operand_left: Operand::Stack(sign, id),
+                                operand_right: Operand::Decimal(true, 0.0),
+                                operation: Operation::Add,
+                                out: new_id,
+                            });
+                            *nof_stacks += 1;
+                            Ok(new_id)
+                        },
                         Operand::X(sign) => {
                             let id = *nof_stacks;
                             instructions.push(Instruction {
@@ -339,11 +408,12 @@ fn generate_instructions<F: Fn(f64, f64) -> f64>(formula: &mut String, instructi
 }
 
 #[cfg(test)]
-mod tests {
-    use formula::Side;
+mod test {
+    use formula::Formula;
+    use std::f64;
     #[test]
-    fn init_formula() {
-        let side = Side::new("x -  2 * x").unwrap();
-        println!("{:?}\nResult: {}", side, side.calc(10.0, 10.0).unwrap());
+    fn test() {
+        let a = Formula::new("y = 5 * sin(x)", 0).unwrap();
+        println!("{:?}\n{}", a, a.right.calc(f64::consts::PI / 2.0, 0.0).unwrap());
     }
 }

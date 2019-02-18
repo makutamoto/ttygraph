@@ -1,14 +1,15 @@
-extern crate graph;
-use graph::Formula;
 extern crate rand;
 use rand::prelude::*;
 #[macro_use] extern crate log;
 extern crate simplelog;
 use simplelog::{ Config, LevelFilter, WriteLogger };
 extern crate ncurses;
+extern crate regex;
 use ncurses::*;
 use std::i16;
 use std::fs::File;
+
+mod formula;
 
 const DEFAULT_GRAPH_COLOR: i16 = 2;
 const X_COLOR: i16 = 3;
@@ -30,7 +31,7 @@ fn main() {
     let mut input = (0usize, String::new());
     let mut error = String::new();
     let mut center = (0, 0);
-    let mut formulae = Vec::<Formula>::new();
+    let mut formulae = Vec::<formula::Formula>::new();
     let mut graph_buffer;
     if cfg!(debug_assertions) { WriteLogger::init(LevelFilter::Trace, Config::default(), File::create("log.txt").unwrap()).unwrap(); };
     initscr();
@@ -114,7 +115,7 @@ fn main() {
                                     if input.0 == formulae.len() {
                                         let pair = nof_graphs_ever + GRAPH_COLOR_START;
                                         let color = if can_change_color() {
-                                            let color = nof_graphs_ever + 8;
+                                            let color = nof_graphs_ever + 12;
                                             init_color(color, rand::thread_rng().gen_range(0, 1001), rand::thread_rng().gen_range(0, 1001), 1000);
                                             color
                                         } else {
@@ -128,7 +129,7 @@ fn main() {
                                         pair
                                     }
                                 };
-                                match Formula::new(&input.1.to_string(), color_pair) {
+                                match formula::Formula::new(&input.1.to_string(), color_pair) {
                                     Ok(formula) => {
                                         formulae.insert(input.0, formula);
                                         mode = Mode::Normal;
@@ -246,7 +247,7 @@ fn main() {
     endwin();
 }
 
-fn draw(mode: &Mode, size: (i32, i32), center: (i32, i32), cursor: usize, input: &String, error: &str, formulae: &Vec<Formula>, graph_buffer: &Vec<Vec<Option<usize>>>) {
+fn draw(mode: &Mode, size: (i32, i32), center: (i32, i32), cursor: usize, input: &String, error: &str, formulae: &Vec<formula::Formula>, graph_buffer: &Vec<Vec<Option<usize>>>) {
     let label = format!("x: {}, y: {}", center.0 as f64, center.1 as f64);
     let physical_center = (get_physical_center_x(size), size.1 / 2);
     curs_set(CURSOR_VISIBILITY::CURSOR_INVISIBLE);
@@ -330,7 +331,7 @@ fn get_physical_center_x(size: (i32, i32)) -> i32 {
     }
 }
 
-fn refresh_buffer(size: (i32, i32), center: (i32, i32), formulae: &Vec<Formula>) -> Vec<Vec<Option<usize>>> {
+fn refresh_buffer(size: (i32, i32), center: (i32, i32), formulae: &Vec<formula::Formula>) -> Vec<Vec<Option<usize>>> {
     let mut buffer = Vec::new();
     for y in 0..size.1 as i32 {
         let mut line = Vec::new();
@@ -353,12 +354,12 @@ fn print_formula(x: i32, y: i32, formula: &str) {
     }
 }
 
-fn eval_for_dot(formulae: &Vec<Formula>, x: i32, y: i32, size: (i32, i32), center: (i32, i32)) -> Option<usize> {
+fn eval_for_dot(formulae: &Vec<formula::Formula>, x: i32, y: i32, size: (i32, i32), center: (i32, i32)) -> Option<usize> {
     let cords = ((x - get_physical_center_x(size) / 2 + center.0) as f64, (size.1 / 2 - y + center.1) as f64);
     for id in (0..formulae.len()).rev() {
         let left = formulae[id].left.calc(cords.0, cords.1);
         let right = formulae[id].right.calc(cords.0, cords.1);
-        if left.is_ok() && right.is_ok() && left.unwrap() == right.unwrap() {
+        if left.is_ok() && right.is_ok() && f64::round(left.unwrap()) == f64::round(right.unwrap()) {
             return Some(id);
         }
     }

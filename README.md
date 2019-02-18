@@ -48,7 +48,12 @@ Formulae must conform to this syntax: `[left] = [right]`
 * `-` : Subtraction
 
 #### Supported Functions
-  Mathematical functions (sin, cos, tan, etc.) will be available for later versions.
+* `abs(A)`: *A* is the number you want to calculate the absolute value.
+* `sin(B)`
+* `cos(B)`: *B* is the angle in radians.
+* `tan(B)`
+
+Other functions (round, floor, etc.) will be available for later versions.
 
 License
 ----------
