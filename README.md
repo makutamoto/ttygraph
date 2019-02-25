@@ -51,12 +51,35 @@ Formulae must conform to this syntax: `[left] = [right]`
 * `-` : Subtraction
 
 #### Supported Functions
-* `abs(A)`: *A* is the number you want to calculate the absolute value.
-* `sin(B)`
-* `cos(B)`: *B* is the angle in radians.
-* `tan(B)`
+* `abs(A)` : Returns the absolute value of *A*.
+* `max(A, B)` : Returns the maximum of *A* and *B*.
+* `min(A, B)` : Returns the minimum of *A* and *B*.
+* `ln(A)` : Calculates ln(*A*).
+* `log(A, B)`: Calculates the logarithm of *B* with *A* as the base.
+* `log2(A)` : Calculates the logarithm of *A* with 2 as the base.
+* `log10(A)` : Calculates the common logarithm of *A*.
+* `root(A, B)` : Calculates the *A*-th root of *B*.
+* `sqrt(A)` : Calculates the square root of *A*.
+* `cbrt(A)`: Calculates the cubic root of *A*.
+* `sin(A)` : Calculates the sin of *A*.
+* `cos(A)` : Calculates the cos of *A*.
+* `tan(A)` : Calculates the tan of *A*.
+* `asin(A)` : Calculates the asin of *A*.
+* `acos(A)` : Calculates the acos of *A*.
+* `atan(A)` : Calculates the atan of *A*.
+* `sinh(A)` : Calculates the sinh of *A*.
+* `cosh(A)` : Calculates the cosh of *A*.
+* `tanh(A)` : Calculates the tanh of *A*.
+* `asinh(A)` : Calculates the asinh of *A*.
+* `acosh(A)` : Calculates the acosh of *A*.
+* `atanh(A)` : Calculates the atanh of *A*.
+* `ceil(A)` : Calculates the ceil of *A*.
+* `floor(A)` : Calculates the floor of *A*.
+* `round(A)` : Rounds *A* to an integer.
 
-Other functions (round, floor, etc.) will be available for later versions.
+#### Constants
+* `PI` : The ratio of the circumference of a circle. (3.14...)
+* `e` : Euler's number. (2.71...)
 
 License
 ----------
