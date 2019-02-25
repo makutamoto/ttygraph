@@ -10,10 +10,31 @@ const INVALID_OPERAND: &str = "Invalid operand!";
 
 #[derive(Debug, Clone)]
 enum Function {
-    Absolute,
-    Sine,
-    Cosine,
-    Tangent,
+    Abs,
+    Max,
+    Min,
+    Ln,
+    Log,
+    Log2,
+    Log10,
+    Root,
+    Sqrt,
+    Cbrt,
+    Sin,
+    Cos,
+    Tan,
+    Asin,
+    Acos,
+    Atan,
+    Sinh,
+    Cosh,
+    Tanh,
+    Asinh,
+    Acosh,
+    Atanh,
+    Ceil,
+    Floor,
+    Round,
 }
 
 #[derive(Debug)]
@@ -87,11 +108,11 @@ impl Formula {
         })
     }
 
-    pub fn raw(self: &Self) -> &str {
+    pub fn get_raw(self: &Self) -> &str {
         &self.raw
     }
 
-    pub fn color_pair(self: &Self) -> i16 {
+    pub fn get_color_pair(self: &Self) -> i16 {
         self.color_pair
     }
 }
@@ -109,14 +130,14 @@ impl Side {
     pub fn new(formula: &str) -> Result<Side, &str> {
         REGEX_INIT.call_once(|| {
             unsafe {
-                UNARY = Some(Regex::new(r"(-?)\s*([xy]|S*\d+)").unwrap());
+                UNARY = Some(Regex::new(r"(-?)\s*((?:[exy]|PI)|S*[\d\.]+)").unwrap());
                 PARENTHESES = Some(Regex::new(r"([\w\d]*)\((.*)\)").unwrap());
                 ARGUMENTS = Some(Regex::new(r"(?:\(.*?\)|[^(,]+)+").unwrap());
-                POWER = Some(Regex::new(r"(-?)\s*([xy]|S*\d+)\s*\^\s*(-?)\s*([xy]|S*\d+)").unwrap());
-                MULTIPLE = Some(Regex::new(r"(-?)\s*([xy]|S*\d+)\s*\*\s*(-?)\s*([xy]|S*\d+)").unwrap());
-                DIVIDE = Some(Regex::new(r"(-?)\s*([xy]|S*\d+)\s*/\s*(-?)\s*([xy]|S*\d+)").unwrap());
-                MODULUS = Some(Regex::new(r"(-?)\s*([xy]|S*\d+)\s*%\s*(-?)\s*([xy]|S*\d+)").unwrap());
-                ADD = Some(Regex::new(r"(-?)\s*([xy]|S*\d+)\s*(?:\+|(-))\s*([xy]|S*\d+)").unwrap());
+                POWER = Some(Regex::new(r"(-?)\s*((?:[exy]|PI)|S*[\d\.]+)\s*\^\s*(-?)\s*((?:[exy]|PI)|S*[\d\.]+)").unwrap());
+                MULTIPLE = Some(Regex::new(r"(-?)\s*((?:[exy]|PI)|S*[\d\.]+)\s*\*\s*(-?)\s*((?:[exy]|PI)|S*[\d\.]+)").unwrap());
+                DIVIDE = Some(Regex::new(r"(-?)\s*((?:[exy]|PI)|S*[\d\.]+)\s*/\s*(-?)\s*((?:[exy]|PI)|S*[\d\.]+)").unwrap());
+                MODULUS = Some(Regex::new(r"(-?)\s*((?:[exy]|PI)|S*[\d\.]+)\s*%\s*(-?)\s*((?:[exy]|PI)|S*[\d\.]+)").unwrap());
+                ADD = Some(Regex::new(r"(-?)\s*((?:[exy]|PI)|S*[\d\.]+)\s*(?:\+|(-))\s*((?:[exy]|PI)|S*[\d\.]+)").unwrap());
             }
         });
         let mut instructions = Vec::new();
@@ -161,10 +182,31 @@ impl Side {
                 Operation::Add => operands.0 + operands.1,
                 Operation::Function(ref name, ref args) => {
                     match name {
-                        Function::Absolute => f64::abs(stacks[args[0]]),
-                        Function::Sine => f64::sin(stacks[args[0]]),
-                        Function::Cosine => f64::cos(stacks[args[0]]),
-                        Function::Tangent => f64::tan(stacks[args[0]]),
+                        Function::Abs => stacks[args[0]].abs(),
+                        Function::Max => stacks[args[0]].max(stacks[args[1]]),
+                        Function::Min => stacks[args[0]].min(stacks[args[1]]),
+                        Function::Ln => stacks[args[0]].ln(),
+                        Function::Log => stacks[args[1]].log(stacks[args[0]]),
+                        Function::Log2 => stacks[args[0]].log2(),
+                        Function::Log10 => stacks[args[0]].log10(),
+                        Function::Root => stacks[args[1]].powf(1.0 / stacks[args[0]]),
+                        Function::Sqrt => stacks[args[0]].sqrt(),
+                        Function::Cbrt => stacks[args[0]].cbrt(),
+                        Function::Sin => stacks[args[0]].sin(),
+                        Function::Cos => stacks[args[0]].cos(),
+                        Function::Tan => stacks[args[0]].tan(),
+                        Function::Asin => stacks[args[0]].asin(),
+                        Function::Acos => stacks[args[0]].acos(),
+                        Function::Atan => stacks[args[0]].atan(),
+                        Function::Sinh => stacks[args[0]].sinh(),
+                        Function::Cosh => stacks[args[0]].cosh(),
+                        Function::Tanh => stacks[args[0]].tanh(),
+                        Function::Asinh => stacks[args[0]].asinh(),
+                        Function::Acosh => stacks[args[0]].acosh(),
+                        Function::Atanh => stacks[args[0]].atanh(),
+                        Function::Ceil => stacks[args[0]].ceil(),
+                        Function::Floor => stacks[args[0]].floor(),
+                        Function::Round => stacks[args[0]].round(),
                     }
                 },
             };
@@ -184,17 +226,38 @@ fn parse(mut formula: String, nof_stacks: &mut usize, instructions: &mut Vec<Ins
             Some(captured) => {
                 let content = captured.get(2).unwrap();
                 range = (content.start(), content.end());
-                fn_name = captured[1].to_ascii_uppercase().to_string();
+                fn_name = captured[1].to_string();
             },
             None => break,
         }
         content = formula.drain(range.0..range.1).collect();
         if fn_name.len() != 0 {
             let function = match fn_name.as_str() {
-                "ABS" => (Function::Absolute, 1),
-                "SIN" => (Function::Sine, 1),
-                "COS" => (Function::Cosine, 1),
-                "TAN" => (Function::Tangent, 1),
+                "abs" => (Function::Abs, 1),
+                "max" => (Function::Max, 2),
+                "min" => (Function::Min, 2),
+                "ln" => (Function::Ln, 1),
+                "log" => (Function::Log, 2),
+                "log2" => (Function::Log2, 1),
+                "log10" => (Function::Log10, 1),
+                "root" => (Function::Root, 2),
+                "sqrt" => (Function::Sqrt, 1),
+                "cbrt" => (Function::Cbrt, 1),
+                "sin" => (Function::Sin, 1),
+                "cos" => (Function::Cos, 1),
+                "tan" => (Function::Tan, 1),
+                "asin" => (Function::Asin, 1),
+                "acos" => (Function::Acos, 1),
+                "atan" => (Function::Atan, 1),
+                "sinh" => (Function::Sinh, 1),
+                "cosh" => (Function::Cosh, 1),
+                "tanh" => (Function::Tanh, 1),
+                "asinh" => (Function::Asinh, 1),
+                "acosh" => (Function::Acosh, 1),
+                "atanh" => (Function::Atanh, 1),
+                "ceil" => (Function::Ceil, 1),
+                "floor" => (Function::Floor, 1),
+                "round" => (Function::Round, 1),
                 _ => return Err("Unimplemented function."),
             };
             let mut args = Vec::new();
@@ -299,6 +362,10 @@ fn parse_operand(operand: &str) -> Result<Operand, &'static str> {
         "-x" => Ok(Operand::X(false)),
         "y" => Ok(Operand::Y(true)),
         "-y" => Ok(Operand::Y(false)),
+        "PI" => Ok(Operand::Decimal(true, std::f64::consts::PI)),
+        "-PI" => Ok(Operand::Decimal(false, std::f64::consts::PI)),
+        "e" => Ok(Operand::Decimal(true, std::f64::consts::E)),
+        "-e" => Ok(Operand::Decimal(false, std::f64::consts::E)),
         _ => {
             let sign = &operand[0..1] != "-";
             let operand = if sign {
@@ -384,11 +451,7 @@ fn generate_instructions<F: Fn(f64, f64) -> f64>(formula: &mut String, instructi
         if let Operand::Decimal(left_sign, left_value) = operands.0 {
             if let Operand::Decimal(right_sign, right_value) = operands.1 {
                 let result = closure(if left_sign { left_value } else { - left_value }, if right_sign { right_value } else { - right_value });
-                if left_sign {
-                    formula.replace_range(range, &result.to_string());
-                } else {
-                    formula.replace_range(range, &format!("+ {}", result.to_string()));
-                }
+                formula.replace_range(range, &result.to_string());
                 continue;
             }
         }
@@ -413,7 +476,7 @@ mod test {
     use std::f64;
     #[test]
     fn test() {
-        let a = Formula::new("y = 5 * sin(x)", 0).unwrap();
+        let a = Formula::new("y = sin(x - PI / 2)", 0).unwrap();
         println!("{:?}\n{}", a, a.right.calc(f64::consts::PI / 2.0, 0.0).unwrap());
     }
 }

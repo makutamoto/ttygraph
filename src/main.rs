@@ -32,6 +32,7 @@ fn main() {
     let mut error = String::new();
     let mut center = (0, 0);
     let mut formulae = Vec::<formula::Formula>::new();
+    let mut history = 0i32;
     let mut graph_buffer;
     if cfg!(debug_assertions) { WriteLogger::init(LevelFilter::Trace, Config::default(), File::create("log.txt").unwrap()).unwrap(); };
     initscr();
@@ -97,8 +98,9 @@ fn main() {
                                 match graph_buffer[size.1 as usize / 2][get_physical_center_x(size) as usize / 2] {
                                     Some(id) => {
                                         input.0 = id;
-                                        input.1 = formulae[id].raw().to_string();
+                                        input.1 = formulae[id].get_raw().to_string();
                                         cursor = input.1.len();
+                                        history = 0;
                                         mode = Mode::Edit;
                                     },
                                     _ => (),
@@ -124,7 +126,7 @@ fn main() {
                                         init_pair(pair, color, -1);
                                         pair
                                     } else {
-                                        let pair = formulae[input.0].color_pair();
+                                        let pair = formulae[input.0].get_color_pair();
                                         formulae.remove(input.0);
                                         pair
                                     }
@@ -145,10 +147,7 @@ fn main() {
                         }
                     },
                     'X' => {
-                        match mode {
-                            Mode::Normal => break,
-                            _ => (),
-                        }
+                        break;
                     },
                     '[' => {
                         if getch() == 0x5B {
@@ -164,7 +163,13 @@ fn main() {
                                             graph_buffer.insert(0, line);
                                             graph_buffer.pop();
                                         },
-                                        Mode::Edit => (),
+                                        Mode::Edit => {
+                                            if input.0 as i32 - history > 0 {
+                                                history += 1;
+                                                input.1 = formulae[(input.0 as i32 - history) as usize].get_raw().to_string();
+                                                cursor = input.1.len();
+                                            }
+                                        },
                                     }
                                 },
                                 'B' => {
@@ -178,7 +183,19 @@ fn main() {
                                             graph_buffer.remove(0);
                                             graph_buffer.push(line);
                                         },
-                                        Mode::Edit => (),
+                                        Mode::Edit => {
+                                            if input.0 as i32 - history < formulae.len() as i32 {
+                                                history -= 1;
+                                                let index = (input.0 as i32 - history) as usize;
+                                                if index == formulae.len() {
+                                                    input.1.clear();
+                                                    cursor = 0;
+                                                } else {
+                                                    input.1 = formulae[index].get_raw().to_string();
+                                                    cursor = input.1.len();
+                                                }
+                                            }
+                                        },
                                     }
                                 },
                                 'C' => {
@@ -283,9 +300,9 @@ fn draw(mode: &Mode, size: (i32, i32), center: (i32, i32), cursor: usize, input:
             }
             attr_off(A_BOLD());
             if let Some(id) = graph_buffer[y as usize][(x / 2) as usize] {
-                attron(COLOR_PAIR(formulae[id].color_pair()));
+                attron(COLOR_PAIR(formulae[id].get_color_pair()));
                 mvprintw(y, x, "*");
-                attroff(COLOR_PAIR(formulae[id].color_pair()));
+                attroff(COLOR_PAIR(formulae[id].get_color_pair()));
             }
             if center_x && y == 0 {
                 attron(COLOR_PAIR(Y_COLOR) | A_BOLD());
@@ -301,7 +318,7 @@ fn draw(mode: &Mode, size: (i32, i32), center: (i32, i32), cursor: usize, input:
     mvprintw(physical_center.1, physical_center.0, "#");
     mvprintw(size.1 - 1, size.0 - label.len() as i32, &label);
     if let Some(id) = graph_buffer[physical_center.1 as usize][physical_center.0 as usize / 2] {
-        let formula = formulae[id].raw();
+        let formula = formulae[id].get_raw();
         mvprintw(physical_center.1, physical_center.0 + 2, "(");
         print_formula(physical_center.0 + 3, physical_center.1, formula);
         mvprintw(physical_center.1, physical_center.0 + 3 + formula.len() as i32, ")");
@@ -309,7 +326,7 @@ fn draw(mode: &Mode, size: (i32, i32), center: (i32, i32), cursor: usize, input:
     match mode {
         Mode::Normal => { mvprintw(size.1 - 1, 0, "^X: quit ^A: add ^E: edit ^D: delete ^C: center"); },
         Mode::Edit => {
-            let label = "^C: cancel [formula]: ";
+            let label = "^X: quit ^C: cancel [formula]: ";
             attron(COLOR_PAIR(ERROR_MESSAGE));
             mvprintw(size.1 - 2, 0, error);
             attroff(COLOR_PAIR(ERROR_MESSAGE));
