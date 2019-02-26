@@ -9,7 +9,8 @@ Installation
 ----------
 You can download pre-compiled binary file from below, or choose to build from source code.
 
-Linux: [ttygraph-linux-latest.tar.gz](./releases/ttygraph-linux-latest.tar.gz)
+Linux: [ttygraph-linux-latest.tar.gz](./releases/ttygraph-linux-latest.tar.gz)  
+macOS: [ttygraph-macos-latest.zip](./releases/ttygraph-macos-latest.zip)  
 
 ### Build from source code
 #### Prerequisites
