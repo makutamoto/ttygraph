@@ -26,11 +26,13 @@ enum Mode {
 fn main() {
     let mut nof_graphs_ever = 0;
     let mut mode = Mode::Normal;
-    let mut size = (0, 0);
+    let mut size;
     let mut cursor = 0;
     let mut input = (0usize, String::new());
     let mut error = String::new();
-    let mut center = (0, 0);
+    let mut center = [0.0; 2];
+    let mut scale = 0;
+    let mut unit = 1.0;
     let mut formulae = Vec::<formula::Formula>::new();
     let mut history = 0i32;
     let mut graph_buffer;
@@ -46,15 +48,25 @@ fn main() {
     }
     raw();
     noecho();
-    getmaxyx(stdscr(), &mut size.1, &mut size.0);
-    graph_buffer = refresh_buffer(size, center, &formulae);
+    {
+        let mut width = 0;
+        let mut height = 0;
+        getmaxyx(stdscr(), &mut height, &mut width);
+        size = [width, height];
+    }
+    graph_buffer = refresh_buffer(size, unit, center, &formulae);
     loop {
-        draw(&mode, size, center, cursor, &input.1, &error, &formulae, &graph_buffer);
+        draw(&mode, size, scale, center, cursor, &input.1, &error, &formulae, &graph_buffer);
         let key = getch();
         if key == KEY_RESIZE {
-            getmaxyx(stdscr(), &mut size.1, &mut size.0);
-            info!("display size: ({}, {})", size.0, size.1);
-            graph_buffer = refresh_buffer(size, center, &formulae);
+            {
+                let mut width = 0;
+                let mut height = 0;
+                getmaxyx(stdscr(), &mut height, &mut width);
+                size = [width, height];
+            }
+            info!("display size: ({}, {})", size[0], size[1]);
+            graph_buffer = refresh_buffer(size, unit, center, &formulae);
         } else {
             if key <= 0x1F {
                 let key = (key + 0x40) as u8 as char;
@@ -71,8 +83,8 @@ fn main() {
                     'C' => {
                         match mode {
                             Mode::Normal => {
-                                center = (0, 0);
-                                graph_buffer = refresh_buffer(size, center, &formulae);
+                                center = [0.0, 0.0];
+                                graph_buffer = refresh_buffer(size, unit, center, &formulae);
                             },
                             Mode::Edit => mode = Mode::Normal,
                         }
@@ -81,10 +93,10 @@ fn main() {
                     'D' => {
                         match mode {
                             Mode::Normal => {
-                                match graph_buffer[size.1 as usize / 2][get_physical_center_x(size) as usize / 2] {
+                                match graph_buffer[size[1] as usize / 2][get_physical_center_x(size) as usize / 2] {
                                     Some(id) => {
                                         formulae.remove(id);
-                                        graph_buffer = refresh_buffer(size, center, &formulae);
+                                        graph_buffer = refresh_buffer(size, unit, center, &formulae);
                                     },
                                     _ => (),
                                 }
@@ -95,7 +107,7 @@ fn main() {
                     'E' => {
                         match mode{
                             Mode::Normal => {
-                                match graph_buffer[size.1 as usize / 2][get_physical_center_x(size) as usize / 2] {
+                                match graph_buffer[size[1] as usize / 2][get_physical_center_x(size) as usize / 2] {
                                     Some(id) => {
                                         input.0 = id;
                                         input.1 = formulae[id].get_raw().to_string();
@@ -105,6 +117,18 @@ fn main() {
                                     },
                                     _ => (),
                                 }
+                            },
+                            _ => (),
+                        }
+                    },
+                    'I' => if scale > -9 {
+                        match mode {
+                            Mode::Normal => {
+                                scale -= 1;
+                                unit = 10.0_f64.powi(scale);
+                                center[0] -= center[0] % unit;
+                                center[1] -= center[1] % unit;
+                                graph_buffer = refresh_buffer(size, unit, center, &formulae);
                             },
                             _ => (),
                         }
@@ -136,7 +160,7 @@ fn main() {
                                         formulae.insert(input.0, formula);
                                         mode = Mode::Normal;
                                         cursor = 0;
-                                        graph_buffer = refresh_buffer(size, center, &formulae);
+                                        graph_buffer = refresh_buffer(size, unit, center, &formulae);
                                         input.1.clear();
                                         error.clear();
                                     },
@@ -146,19 +170,32 @@ fn main() {
                             },
                         }
                     },
+                    'O' => if scale < 9 {
+                        match mode {
+                            Mode::Normal => {
+                                scale += 1;
+                                unit = 10.0_f64.powi(scale);
+                                center[0] -= center[0] % unit;
+                                center[1] -= center[1] % unit;
+                                graph_buffer = refresh_buffer(size, unit, center, &formulae);
+                            },
+                            _ => (),
+                        }
+                    },
                     'X' => {
                         break;
                     },
                     '[' => {
                         if getch() == 0x5B {
+                            let move_unit = 10.0_f64.powi(scale);
                             match getch() as u8 as char {
                                 'A' => {
                                     match mode {
                                         Mode::Normal => {
                                             let mut line = Vec::new();
-                                            center.1 += 1;
+                                            center[1] += move_unit;
                                             for x in 0..graph_buffer[0].len() as i32 {
-                                                line.push(eval_for_dot(&formulae, x, 0, size, center));
+                                                line.push(eval_for_dot(&formulae, x, 0, size, unit, center));
                                             }
                                             graph_buffer.insert(0, line);
                                             graph_buffer.pop();
@@ -176,9 +213,9 @@ fn main() {
                                     match mode {
                                         Mode::Normal => {
                                             let mut line = Vec::new();
-                                            center.1 -= 1;
+                                            center[1] -= move_unit;
                                             for x in 0..graph_buffer[0].len() as i32 {
-                                                line.push(eval_for_dot(&formulae, x, graph_buffer.len() as i32 - 1, size, center));
+                                                line.push(eval_for_dot(&formulae, x, graph_buffer.len() as i32 - 1, size, unit, center));
                                             }
                                             graph_buffer.remove(0);
                                             graph_buffer.push(line);
@@ -202,9 +239,9 @@ fn main() {
                                     match mode {
                                         Mode::Normal => {
                                             let width = graph_buffer[0].len() as i32;
-                                            center.0 += 1;
+                                            center[0] += move_unit;
                                             for y in 0..graph_buffer.len() {
-                                                graph_buffer[y].push(eval_for_dot(&formulae, width - 1, y as i32, size, center));
+                                                graph_buffer[y].push(eval_for_dot(&formulae, width - 1, y as i32, size, unit, center));
                                                 graph_buffer[y].remove(0);
                                             }
                                         },
@@ -220,10 +257,10 @@ fn main() {
                                 'D' => {
                                     match mode {
                                         Mode::Normal => {
-                                            center.0 -= 1;
+                                            center[0] -= move_unit;
                                             for y in 0..graph_buffer.len() {
                                                 graph_buffer[y].pop();
-                                                graph_buffer[y].insert(0, eval_for_dot(&formulae, 0, y as i32, size, center));
+                                                graph_buffer[y].insert(0, eval_for_dot(&formulae, 0, y as i32, size, unit, center));
                                             }
                                         },
                                         Mode::Edit => {
@@ -264,18 +301,22 @@ fn main() {
     endwin();
 }
 
-fn draw(mode: &Mode, size: (i32, i32), center: (i32, i32), cursor: usize, input: &String, error: &str, formulae: &Vec<formula::Formula>, graph_buffer: &Vec<Vec<Option<usize>>>) {
-    let label = format!("x: {}, y: {}", center.0 as f64, center.1 as f64);
-    let physical_center = (get_physical_center_x(size), size.1 / 2);
+fn draw(mode: &Mode, size: [i32; 2], scale: i32, center: [f64; 2], cursor: usize, input: &String, error: &str, formulae: &Vec<formula::Formula>, graph_buffer: &Vec<Vec<Option<usize>>>) {
+    info!("DRAW_CALL");
+    let scale_abs = 10_i32.pow(scale.abs() as u32);
+    let nof_dec_places = if scale < 0 { scale.abs() as usize } else { 0 };
+    let label = format!("scale: {}, x: {:.*}, y: {:.*}", if scale > 0 { format!("1/{}", scale_abs) } else { scale_abs.to_string() }, nof_dec_places, center[0], nof_dec_places, center[1]);
+    let unit = 10.0_f64.powi(scale);
+    let physical_center = (get_physical_center_x(size), size[1] / 2);
     curs_set(CURSOR_VISIBILITY::CURSOR_INVISIBLE);
-    for x in 0..size.0 {
-        for y in 0..size.1 {
+    for x in 0..size[0] {
+        for y in 0..size[1] {
             if x % 2 != 0 {
                 mvprintw(y, x, " ");
                 continue;
             }
-            let cord_x = ((x - size.0 / 2) as f64 / 2.0).ceil() as i32 + center.0;
-            let cord_y = size.1 / 2 - y + center.1;
+            let cord_x = (((x - size[0] / 2) as f64 / 2.0).ceil()  + (center[0] / unit).round()) as i32;
+            let cord_y = size[1] / 2 - y + (center[1] / unit).round() as i32;
             let center_x = cord_x == 0;
             let center_y = cord_y == 0;
             attr_on(A_BOLD());
@@ -308,7 +349,7 @@ fn draw(mode: &Mode, size: (i32, i32), center: (i32, i32), cursor: usize, input:
                 attron(COLOR_PAIR(Y_COLOR) | A_BOLD());
                 mvprintw(y, x, "Y");
                 attroff(COLOR_PAIR(Y_COLOR) | A_BOLD());
-            } else if center_y && (x == size.0 - 1 || x == size.0 - 2) {
+            } else if center_y && (x == size[0] - 1 || x == size[0] - 2) {
                 attron(COLOR_PAIR(X_COLOR) | A_BOLD());
                 mvprintw(y, x, "X");
                 attroff(COLOR_PAIR(X_COLOR) | A_BOLD());
@@ -316,7 +357,7 @@ fn draw(mode: &Mode, size: (i32, i32), center: (i32, i32), cursor: usize, input:
         }
     }
     mvprintw(physical_center.1, physical_center.0, "#");
-    mvprintw(size.1 - 1, size.0 - label.len() as i32, &label);
+    mvprintw(size[1] - 1, size[0] - label.len() as i32, &label);
     if let Some(id) = graph_buffer[physical_center.1 as usize][physical_center.0 as usize / 2] {
         let formula = formulae[id].get_raw();
         mvprintw(physical_center.1, physical_center.0 + 2, "(");
@@ -324,23 +365,23 @@ fn draw(mode: &Mode, size: (i32, i32), center: (i32, i32), cursor: usize, input:
         mvprintw(physical_center.1, physical_center.0 + 3 + formula.len() as i32, ")");
     }
     match mode {
-        Mode::Normal => { mvprintw(size.1 - 1, 0, "^X: quit ^A: add ^E: edit ^D: delete ^C: center"); },
+        Mode::Normal => { mvprintw(size[1] - 1, 0, "^X: quit ^A: add ^E: edit ^D: delete ^C: center ^I/O: zoom in/out"); },
         Mode::Edit => {
             let label = "^X: quit ^C: cancel [formula]: ";
             attron(COLOR_PAIR(ERROR_MESSAGE));
-            mvprintw(size.1 - 2, 0, error);
+            mvprintw(size[1] - 2, 0, error);
             attroff(COLOR_PAIR(ERROR_MESSAGE));
-            mvprintw(size.1 - 1, 0, label);
-            print_formula(label.len() as i32, size.1 - 1, &input);
-            mv(size.1 - 1, (label.len() + cursor) as i32);
+            mvprintw(size[1] - 1, 0, label);
+            print_formula(label.len() as i32, size[1] - 1, &input);
+            mv(size[1] - 1, (label.len() + cursor) as i32);
             curs_set(CURSOR_VISIBILITY::CURSOR_VISIBLE);
         },
     }
     refresh();
 }
 
-fn get_physical_center_x(size: (i32, i32)) -> i32 {
-    let half = size.0 / 2;
+fn get_physical_center_x(size: [i32; 2]) -> i32 {
+    let half = size[0] / 2;
     if half % 2 == 0 {
         half
     } else {
@@ -348,12 +389,12 @@ fn get_physical_center_x(size: (i32, i32)) -> i32 {
     }
 }
 
-fn refresh_buffer(size: (i32, i32), center: (i32, i32), formulae: &Vec<formula::Formula>) -> Vec<Vec<Option<usize>>> {
+fn refresh_buffer(size: [i32; 2], unit: f64, center: [f64; 2], formulae: &Vec<formula::Formula>) -> Vec<Vec<Option<usize>>> {
     let mut buffer = Vec::new();
-    for y in 0..size.1 as i32 {
+    for y in 0..size[1] as i32 {
         let mut line = Vec::new();
-        for x in 0..(size.0 as f64 / 2.0).ceil() as i32 {
-            line.push(eval_for_dot(&formulae, x, y, size, center));
+        for x in 0..(size[0] as f64 / 2.0).ceil() as i32 {
+            line.push(eval_for_dot(&formulae, x, y, size, unit, center));
         }
         buffer.push(line);
     }
@@ -371,12 +412,12 @@ fn print_formula(x: i32, y: i32, formula: &str) {
     }
 }
 
-fn eval_for_dot(formulae: &Vec<formula::Formula>, x: i32, y: i32, size: (i32, i32), center: (i32, i32)) -> Option<usize> {
-    let cords = ((x - get_physical_center_x(size) / 2 + center.0) as f64, (size.1 / 2 - y + center.1) as f64);
+fn eval_for_dot(formulae: &Vec<formula::Formula>, x: i32, y: i32, size: [i32; 2], unit: f64, center: [f64; 2]) -> Option<usize> {
+    let cords = [(x - get_physical_center_x(size) / 2) as f64 * unit + center[0], (size[1] / 2 - y) as f64 * unit + center[1]];
     for id in (0..formulae.len()).rev() {
-        let left = formulae[id].left.calc(cords.0, cords.1);
-        let right = formulae[id].right.calc(cords.0, cords.1);
-        if left.is_ok() && right.is_ok() && f64::round(left.unwrap()) == f64::round(right.unwrap()) {
+        let left = formulae[id].left.calc(cords[0], cords[1]);
+        let right = formulae[id].right.calc(cords[0], cords[1]);
+        if left.is_ok() && right.is_ok() && (left.unwrap() / unit).round() == (right.unwrap() / unit).round() {
             return Some(id);
         }
     }

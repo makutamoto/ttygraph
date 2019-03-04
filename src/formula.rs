@@ -131,7 +131,7 @@ impl Side {
         REGEX_INIT.call_once(|| {
             unsafe {
                 UNARY = Some(Regex::new(r"(-?)\s*((?:[exy]|PI)|S*[\d\.]+)").unwrap());
-                PARENTHESES = Some(Regex::new(r"([\w\d]*)\((.*)\)").unwrap());
+                PARENTHESES = Some(Regex::new(r"([\w\d]*)\(([^\(\)]*)\)").unwrap());
                 ARGUMENTS = Some(Regex::new(r"(?:\(.*?\)|[^(,]+)+").unwrap());
                 POWER = Some(Regex::new(r"(-?)\s*((?:[exy]|PI)|S*[\d\.]+)\s*\^\s*(-?)\s*((?:[exy]|PI)|S*[\d\.]+)").unwrap());
                 MULTIPLE = Some(Regex::new(r"(-?)\s*((?:[exy]|PI)|S*[\d\.]+)\s*\*\s*(-?)\s*((?:[exy]|PI)|S*[\d\.]+)").unwrap());
@@ -476,7 +476,7 @@ mod test {
     use std::f64;
     #[test]
     fn test() {
-        let a = Formula::new("y = sin(x - PI / 2)", 0).unwrap();
+        let a = Formula::new("y = round(x) + sin(x - PI / 2)", 0).unwrap();
         println!("{:?}\n{}", a, a.right.calc(f64::consts::PI / 2.0, 0.0).unwrap());
     }
 }

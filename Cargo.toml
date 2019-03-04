@@ -1,6 +1,6 @@
 [package]
 name = "ttygraph"
-version = "0.3.0"
+version = "1.0.0"
 authors = ["Makutamoto <34860673+makutamoto@users.noreply.github.com>"]
 
 [dependencies]
