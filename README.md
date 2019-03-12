@@ -29,15 +29,16 @@ Usage
 
 The center positioned `#` is a cursor. You can select a graph by overlapping with this.
 
-* `arrow keys` : move around the coordinate plane
-* `ctrl` + `X` : quit this program
-* `ctrl` + `A` : add a new graph
-* `ctrl` + `E` : edit a selected graph
-* `ctrl` + `D` : delete a selected graph
-* `ctrl` + `C` : back to center (origin)
+* `arrow keys` : move around the coordinate plane.
+* `ctrl` + `X` : quit this program.
+* `ctrl` + `A` : add a new graph.
+* `ctrl` + `E` : edit a selected graph.
+* `ctrl` + `D` : delete a selected graph.
+* `ctrl` + `C` : back to center. (origin)
+* `ctrl` + `I/O` : Zoom in/out.
 
 ### Inputting a formula
-![editing](./resources/inputting.png)
+![editing](./resources/inputting.gif)
 
 This program use mathematical formulae to display graphs such as `x ^ 2 + y ^ 2 = 100` as shown in the above image.
 
