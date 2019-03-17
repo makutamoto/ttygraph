@@ -160,7 +160,13 @@ impl Side {
             let result = match instruction.operation {
                 Operation::Power => {
                     if operands.1 < 0.0 { return Err(POWERED_BY_NEG); }
-                    operands.0.powf(operands.1)
+                    let left = operand_into_signed_decimal(&stacks, &instruction.operand_left, x, y);
+                    let result = left.1.powf(operands.1);
+                    if left.0 {
+                        result
+                    } else {
+                        - result
+                    }
                 },
                 Operation::Multiple => operands.0 * operands.1,
                 Operation::Divide => {
@@ -409,6 +415,15 @@ fn operand_into_decimal(stacks: &Vec<f64>, operand: &Operand, x: f64, y: f64) ->
                 - y
             }
         },
+    }
+}
+
+fn operand_into_signed_decimal(stacks: &Vec<f64>, operand: &Operand, x: f64, y: f64) -> (bool, f64) {
+    match *operand {
+        Operand::Decimal(sign, value) => (sign, value),
+        Operand::Stack(sign, id) => (sign, stacks[id]),
+        Operand::X(sign) => (sign, x),
+        Operand::Y(sign) => (sign, y),
     }
 }
 
