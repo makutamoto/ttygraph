@@ -2,7 +2,7 @@ use std::sync::Once;
 use regex::Regex;
 
 const SYNTAX_ERROR: &str = "Formulae must conform this syntax: [Left] = [Right]";
-const DIVIDED_BY_NEG: &str = "Numbers can't be powerd by negative values.";
+const POWERED_BY_NEG: &str = "Numbers can't be powerd by negative values.";
 const DIVIDED_BY_ZERO: &str = "Numbers can't be divided by 0.";
 const NO_OPERAND_FOUND: &str = "No operand found.";
 const INVALID_STACK: &str = "Invalid stack id.";
@@ -159,17 +159,8 @@ impl Side {
             let operands = (operand_into_decimal(&stacks, &instruction.operand_left, x, y), operand_into_decimal(&stacks, &instruction.operand_right, x, y));
             let result = match instruction.operation {
                 Operation::Power => {
-                    let left_operand = operand_into_signed_decimal(&stacks, &instruction.operand_left, x, y);
-                    let result;
-                    if operands.1 < 0.0 {
-                        return Err(DIVIDED_BY_NEG);
-                    }
-                    result = operands.0.powf(operands.1);
-                    if left_operand.0 {
-                        result
-                    } else {
-                        - result
-                    }
+                    if operands.1 < 0.0 { return Err(POWERED_BY_NEG); }
+                    operands.0.powf(operands.1)
                 },
                 Operation::Multiple => operands.0 * operands.1,
                 Operation::Divide => {
@@ -421,15 +412,6 @@ fn operand_into_decimal(stacks: &Vec<f64>, operand: &Operand, x: f64, y: f64) ->
     }
 }
 
-fn operand_into_signed_decimal(stacks: &Vec<f64>, operand: &Operand, x: f64, y: f64) -> (bool, f64) {
-    match *operand {
-        Operand::Decimal(sign, value) => (sign, value),
-        Operand::Stack(sign, id) => (sign, stacks[id]),
-        Operand::X(sign) => (sign, x),
-        Operand::Y(sign) => (sign, y),
-    }
-}
-
 fn generate_instructions<F: Fn(f64, f64) -> f64>(formula: &mut String, instructions: &mut Vec<Instruction>, nof_stacks: &mut usize, regex: &Regex, closure: F, operation: Operation) {
     loop {
         let range;
@@ -476,7 +458,8 @@ mod test {
     use std::f64;
     #[test]
     fn test() {
-        let a = Formula::new("y = round(x) + sin(x - PI / 2)", 0).unwrap();
-        println!("{:?}\n{}", a, a.right.calc(f64::consts::PI / 2.0, 0.0).unwrap());
+        let formula = Formula::new("y = - x ^ 3", 0).unwrap();
+        println!("{:?}", formula);
+        println!("{}", formula.right.calc(-10.0, 0.0).unwrap());
     }
 }

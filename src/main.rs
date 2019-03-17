@@ -75,6 +75,7 @@ fn main() {
                         match mode {
                             Mode::Normal => {
                                 input.0 = formulae.len();
+                                cursor = 0;
                                 mode = Mode::Edit;
                             },
                             _ => (),
@@ -159,7 +160,6 @@ fn main() {
                                     Ok(formula) => {
                                         formulae.insert(input.0, formula);
                                         mode = Mode::Normal;
-                                        cursor = 0;
                                         graph_buffer = refresh_buffer(size, unit, center, &formulae);
                                         input.1.clear();
                                         error.clear();
